@@ -1,5 +1,5 @@
 import type { ClientMessage, ServerMessage, Room, Player } from '@wgp/shared'
-import { ExplodingKittensPlugin } from '../../games/exploding-kittens/src/index'
+import { ExplodingKittensPlugin } from '@wgp/game-exploding-kittens'
 
 const PLUGINS = {
   'exploding-kittens': ExplodingKittensPlugin,

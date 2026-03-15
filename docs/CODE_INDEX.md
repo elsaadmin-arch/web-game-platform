@@ -18,7 +18,7 @@ Quick-scan reference for locating files. One line per entry.
 
 | File | Description | Keywords |
 |---|---|---|
-| `workers/room-worker/src/index.ts` | Cloudflare Durable Objects room worker — handles HTTP fetch, WebSocket connections, join/rejoin/start_game/action/rematch routing, broadcasts room_update | durable object, websocket, room, broadcast, CF worker |
+| `workers/room-worker/src/index.ts` | Cloudflare Durable Objects room worker — handles HTTP fetch, WebSocket connections, join/rejoin/start_game/action/rematch routing, broadcasts room_update. Imports ExplodingKittensPlugin via `@wgp/game-exploding-kittens` | durable object, websocket, room, broadcast, CF worker |
 | `workers/room-worker/src/__tests__/room.test.ts` | Worker integration tests for room creation and player join flow | tests, room, worker |
 | `workers/room-worker/wrangler.toml` | Wrangler config — DO binding ROOMS → RoomDurableObject, migration tag v1 | wrangler, config, durable object |
 

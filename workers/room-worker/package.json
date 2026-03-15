@@ -7,6 +7,7 @@
     "deploy": "wrangler deploy"
   },
   "dependencies": {
-    "@wgp/shared": "*"
+    "@wgp/shared": "*",
+    "@wgp/game-exploding-kittens": "*"
   }
 }
