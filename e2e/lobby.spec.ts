@@ -148,4 +148,43 @@ test.describe('Session persistence', () => {
     await page.reload()
     await expect(page.locator('.font-mono.font-bold')).toHaveText(codeText.trim())
   })
+
+  test('host still appears in player list after reload', async ({ page }) => {
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Create Room' }).click()
+    await page.getByPlaceholder('Your name').fill('Alice')
+    await page.getByRole('button', { name: 'Create Room' }).click()
+    await expect(page.getByText('Alice')).toBeVisible({ timeout: 5000 })
+
+    await page.reload()
+    await expect(page.getByText('Alice')).toBeVisible({ timeout: 5000 })
+  })
+
+  test('second player still visible after host reloads', async ({ browser }) => {
+    const ctx1 = await browser.newContext()
+    const page1 = await ctx1.newPage()
+    await page1.goto('/')
+    await page1.getByRole('button', { name: 'Create Room' }).click()
+    await page1.getByPlaceholder('Your name').fill('Alice')
+    await page1.getByRole('button', { name: 'Create Room' }).click()
+    const codeText = await page1.locator('.font-mono.font-bold').innerText()
+    const code = codeText.replace(/\s/g, '')
+
+    const ctx2 = await browser.newContext()
+    const page2 = await ctx2.newPage()
+    await page2.goto('/')
+    await page2.getByRole('button', { name: 'Join Room' }).click()
+    await page2.getByPlaceholder('Your name').fill('Bob')
+    await page2.getByPlaceholder('Room code').fill(code)
+    await page2.getByRole('button', { name: 'Join' }).click()
+    await expect(page1.getByText('Bob')).toBeVisible({ timeout: 5000 })
+
+    // Host reloads — should see both players
+    await page1.reload()
+    await expect(page1.getByText('Alice')).toBeVisible({ timeout: 5000 })
+    await expect(page1.getByText('Bob')).toBeVisible({ timeout: 5000 })
+
+    await ctx1.close()
+    await ctx2.close()
+  })
 })

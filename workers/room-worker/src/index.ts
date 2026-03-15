@@ -6,17 +6,27 @@ function generateRoomCode(): string {
 }
 
 export class RoomDurableObject {
-  private sessions: Map<WebSocket, Player> = new Map()
+  private sessions: Map<WebSocket, string> = new Map()  // ws -> playerId
   private room: Room | null = null
+  private state: DurableObjectState
+
+  constructor(state: DurableObjectState) {
+    this.state = state
+  }
 
   async fetch(request: Request): Promise<Response> {
+    // Restore room from storage on cold start
+    if (!this.room) {
+      this.room = await this.state.storage.get<Room>('room') ?? null
+    }
+
     const url = new URL(request.url)
 
     if (request.headers.get('Upgrade') === 'websocket') {
       return this.handleWebSocket(request)
     }
 
-    if (request.method === 'GET' && url.pathname.endsWith('/')) {
+    if (request.method === 'GET') {
       return Response.json(this.room)
     }
 
@@ -25,8 +35,6 @@ export class RoomDurableObject {
 
   private async handleWebSocket(request: Request): Promise<Response> {
     const { 0: client, 1: server } = new WebSocketPair()
-
-    // Use non-hibernatable pattern — just accept directly
     server.accept()
 
     server.addEventListener('message', (event) => {
@@ -39,14 +47,14 @@ export class RoomDurableObject {
     })
 
     server.addEventListener('close', () => {
-      const player = this.sessions.get(server)
-      if (player) {
-        player.connected = false
+      const playerId = this.sessions.get(server)
+      if (playerId && this.room) {
+        // Mark as disconnected but keep in room (they may rejoin)
+        const player = this.room.players.find(p => p.id === playerId)
+        if (player) player.connected = false
         this.sessions.delete(server)
-        if (this.room) {
-          this.room.players = this.room.players.filter(p => p.id !== player.id)
-        }
-        this.broadcast({ type: 'player_left', playerId: player.id })
+        this.saveRoom()
+        this.broadcast({ type: 'player_left', playerId })
       }
     })
 
@@ -58,13 +66,32 @@ export class RoomDurableObject {
   }
 
   private handleMessage(ws: WebSocket, msg: ClientMessage) {
+    if (msg.type === 'rejoin') {
+      // Existing player reconnecting — restore their slot
+      if (!this.room) {
+        this.send(ws, { type: 'error', message: 'Room not found' })
+        return
+      }
+      const player = this.room.players.find(p => p.id === msg.playerId)
+      if (!player) {
+        // Player not in room — treat as fresh join
+        this.handleMessage(ws, { type: 'join', name: msg.name })
+        return
+      }
+      player.connected = true
+      this.sessions.set(ws, player.id)
+      this.saveRoom()
+      this.broadcast({ type: 'room_update', room: this.room })
+      return
+    }
+
     if (msg.type === 'join') {
       const player: Player = {
         id: crypto.randomUUID(),
         name: msg.name,
         connected: true,
       }
-      this.sessions.set(ws, player)
+      this.sessions.set(ws, player.id)
 
       if (!this.room) {
         this.room = {
@@ -81,21 +108,26 @@ export class RoomDurableObject {
         this.room.lastActivityAt = Date.now()
       }
 
-      // Broadcast new player to everyone else first
+      this.saveRoom()
       this.broadcastExcept(ws, { type: 'player_joined', player })
-      // Then send full room state to everyone
       this.broadcast({ type: 'room_update', room: this.room })
     }
 
     if (msg.type === 'action' && this.room) {
-      // TODO: route to game plugin applyAction
       this.room.lastActivityAt = Date.now()
+      this.saveRoom()
+      // TODO: route to game plugin applyAction
     }
 
     if (msg.type === 'rematch' && this.room) {
-      // TODO: reset game state
       this.room.lastActivityAt = Date.now()
+      this.saveRoom()
+      // TODO: reset game state
     }
+  }
+
+  private saveRoom() {
+    if (this.room) this.state.storage.put('room', this.room)
   }
 
   private send(ws: WebSocket, msg: ServerMessage) {
@@ -103,9 +135,7 @@ export class RoomDurableObject {
   }
 
   private broadcast(msg: ServerMessage) {
-    for (const ws of this.sessions.keys()) {
-      this.send(ws, msg)
-    }
+    for (const ws of this.sessions.keys()) this.send(ws, msg)
   }
 
   private broadcastExcept(skip: WebSocket, msg: ServerMessage) {

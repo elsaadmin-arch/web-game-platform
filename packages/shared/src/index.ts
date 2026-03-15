@@ -49,6 +49,7 @@ export interface Player {
 // WebSocket message types
 export type ClientMessage =
   | { type: 'join'; name: string }
+  | { type: 'rejoin'; playerId: string; name: string }
   | { type: 'action'; action: PlayerAction }
   | { type: 'rematch' }
   | { type: 'leave' }

@@ -58,7 +58,13 @@ export default function App() {
     wsRef.current = ws
 
     ws.onopen = () => {
-      ws.send(JSON.stringify({ type: 'join', name: playerName }))
+      const savedId = playerIdRef.current
+      if (savedId) {
+        // Reconnecting — rejoin as existing player
+        ws.send(JSON.stringify({ type: 'rejoin', playerId: savedId, name: playerName }))
+      } else {
+        ws.send(JSON.stringify({ type: 'join', name: playerName }))
+      }
     }
 
     ws.onmessage = (event) => {
