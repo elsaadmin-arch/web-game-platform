@@ -10,11 +10,18 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "test:workers": "vitest run --config vitest.workers.config.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:all": "npm run test && npm run test:workers && npm run test:e2e"
   },
   "devDependencies": {
-    "vitest": "^3.0.0",
-    "@vitest/ui": "^3.0.0",
-    "happy-dom": "^17.0.0"
+    "@cloudflare/vitest-pool-workers": "*",
+    "@cloudflare/workers-types": "*",
+    "@playwright/test": "*",
+    "@vitest/ui": "^4.1.0",
+    "happy-dom": "^17.0.0",
+    "vitest": "^4.1.0"
   }
 }
