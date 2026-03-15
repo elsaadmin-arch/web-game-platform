@@ -40,10 +40,6 @@ export function useRoom() {
         if (msg.room.state.phase !== 'waiting') {
           setGameState(msg.room.state as EKGameState)
           setScreen('in-game')
-        } else {
-          // Game reset (rematch) — go back to waiting room
-          setGameState(null)
-          setScreen('waiting-room')
         }
         if (!playerIdRef.current) {
           const me = msg.room.players.find((p: Player) => p.name === playerName)

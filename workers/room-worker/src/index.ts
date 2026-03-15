@@ -180,7 +180,13 @@ export class RoomDurableObject {
       const playerId = this.sessions.get(ws)
       if (playerId !== this.room.hostId) return
 
-      this.room.state = { phase: 'waiting', currentPlayerId: null, winner: null }
+      const plugin = PLUGINS[this.room.gameId]
+      if (plugin) {
+        const playerIds = this.room.players.map(p => p.id)
+        this.room.state = plugin.getInitialState(playerIds, {})
+      } else {
+        this.room.state = { phase: 'waiting', currentPlayerId: null, winner: null }
+      }
       this.room.lastActivityAt = Date.now()
       this.saveRoom()
       this.broadcast({ type: 'room_update', room: this.room })
