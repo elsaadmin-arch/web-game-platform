@@ -138,9 +138,24 @@ export default function App() {
   }
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(roomCode)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(roomCode)
+      } else {
+        // Fallback for LAN HTTP (non-HTTPS)
+        const el = document.createElement('input')
+        el.value = roomCode
+        document.body.appendChild(el)
+        el.select()
+        document.execCommand('copy')
+        document.body.removeChild(el)
+      }
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Last resort: show the code prominently so user can copy manually
+      setCopied(false)
+    }
   }
 
   const handleStartGame = () => {

@@ -1,6 +1,5 @@
 import type { ClientMessage, ServerMessage, Room, Player } from '@wgp/shared'
 
-// Generates a 6-char room code (no ambiguous chars)
 function generateRoomCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
   return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
@@ -9,22 +8,15 @@ function generateRoomCode(): string {
 export class RoomDurableObject {
   private sessions: Map<WebSocket, Player> = new Map()
   private room: Room | null = null
-  private state: DurableObjectState
-
-  constructor(state: DurableObjectState) {
-    this.state = state
-  }
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url)
 
-    // WebSocket upgrade
     if (request.headers.get('Upgrade') === 'websocket') {
       return this.handleWebSocket(request)
     }
 
-    // REST: GET room info
-    if (request.method === 'GET' && url.pathname === '/') {
+    if (request.method === 'GET' && url.pathname.endsWith('/')) {
       return Response.json(this.room)
     }
 
@@ -33,7 +25,9 @@ export class RoomDurableObject {
 
   private async handleWebSocket(request: Request): Promise<Response> {
     const { 0: client, 1: server } = new WebSocketPair()
-    this.state.acceptWebSocket(server)
+
+    // Use non-hibernatable pattern — just accept directly
+    server.accept()
 
     server.addEventListener('message', (event) => {
       try {
@@ -49,8 +43,15 @@ export class RoomDurableObject {
       if (player) {
         player.connected = false
         this.sessions.delete(server)
+        if (this.room) {
+          this.room.players = this.room.players.filter(p => p.id !== player.id)
+        }
         this.broadcast({ type: 'player_left', playerId: player.id })
       }
+    })
+
+    server.addEventListener('error', () => {
+      this.sessions.delete(server)
     })
 
     return new Response(null, { status: 101, webSocket: client })
@@ -66,7 +67,6 @@ export class RoomDurableObject {
       this.sessions.set(ws, player)
 
       if (!this.room) {
-        // Room doesn't exist yet — this player is the host
         this.room = {
           id: generateRoomCode(),
           gameId: 'exploding-kittens',
@@ -81,23 +81,25 @@ export class RoomDurableObject {
         this.room.lastActivityAt = Date.now()
       }
 
-      this.broadcast({ type: 'player_joined', player })
+      // Broadcast new player to everyone else first
+      this.broadcastExcept(ws, { type: 'player_joined', player })
+      // Then send full room state to everyone
       this.broadcast({ type: 'room_update', room: this.room })
     }
 
     if (msg.type === 'action' && this.room) {
-      // TODO: route to game plugin applyAction, then broadcast new state
+      // TODO: route to game plugin applyAction
       this.room.lastActivityAt = Date.now()
     }
 
     if (msg.type === 'rematch' && this.room) {
-      // TODO: reset game state via game plugin getInitialState
+      // TODO: reset game state
       this.room.lastActivityAt = Date.now()
     }
   }
 
   private send(ws: WebSocket, msg: ServerMessage) {
-    ws.send(JSON.stringify(msg))
+    try { ws.send(JSON.stringify(msg)) } catch {}
   }
 
   private broadcast(msg: ServerMessage) {
@@ -105,27 +107,32 @@ export class RoomDurableObject {
       this.send(ws, msg)
     }
   }
+
+  private broadcastExcept(skip: WebSocket, msg: ServerMessage) {
+    for (const ws of this.sessions.keys()) {
+      if (ws !== skip) this.send(ws, msg)
+    }
+  }
 }
 
-// Worker entry — routes /rooms/:code to the right Durable Object
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
-    const match = url.pathname.match(/^\/rooms\/([A-Z0-9]{6})/)
+    const match = url.pathname.match(/^\/rooms\/([A-Z2-9]{6})/)
 
-    if (!match) {
-      // Create new room — return a generated code
-      if (request.method === 'POST' && url.pathname === '/rooms') {
-        const code = generateRoomCode()
-        return Response.json({ code })
-      }
-      return new Response('Not found', { status: 404 })
+    if (match) {
+      const code = match[1]
+      const id = env.ROOMS.idFromName(code)
+      const stub = env.ROOMS.get(id)
+      return stub.fetch(request)
     }
 
-    const code = match[1]
-    const id = env.ROOMS.idFromName(code)
-    const stub = env.ROOMS.get(id)
-    return stub.fetch(request)
+    if (request.method === 'POST' && url.pathname === '/rooms') {
+      const code = generateRoomCode()
+      return Response.json({ code })
+    }
+
+    return new Response('Not found', { status: 404 })
   },
 }
 
