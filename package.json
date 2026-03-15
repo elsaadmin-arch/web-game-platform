@@ -6,5 +6,15 @@
     "workers/*",
     "games/*",
     "packages/*"
-  ]
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0",
+    "@vitest/ui": "^3.0.0",
+    "happy-dom": "^17.0.0"
+  }
 }

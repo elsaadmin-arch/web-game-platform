@@ -9,9 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tailwindcss/vite": "^4.2.1",
+    "@wgp/shared": "*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "@wgp/shared": "*"
+    "tailwindcss": "^4.2.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.1",

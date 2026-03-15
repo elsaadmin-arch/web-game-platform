@@ -26,24 +26,27 @@ export interface EKGameState extends GameState {
   pendingNope: boolean
 }
 
-function buildDeck(playerCount: number): Card[] {
+function buildDeck(playerCount: number): { deck: Card[], bombs: Card[] } {
   const cards: Card[] = []
   let id = 0
   const add = (type: CardType, count: number) => {
     for (let i = 0; i < count; i++) cards.push({ id: `${type}-${id++}`, type })
   }
 
-  // Defuse cards go to players' hands, not the deck
   add('skip', 4)
   add('attack', 4)
   add('nope', 5)
   add('see_the_future', 5)
   add('shuffle', 4)
   add('favor', 4)
-  // Exploding kittens = playerCount - 1
-  add('exploding_kitten', playerCount - 1)
 
-  return shuffle(cards)
+  // Exploding kittens inserted AFTER dealing, kept separate
+  const bombs: Card[] = []
+  for (let i = 0; i < playerCount - 1; i++) {
+    bombs.push({ id: `exploding_kitten-${id++}`, type: 'exploding_kitten' })
+  }
+
+  return { deck: shuffle(cards), bombs }
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -62,22 +65,26 @@ export const ExplodingKittensPlugin: GamePlugin = {
   maxPlayers: 5,
 
   getInitialState(playerIds: string[], config: GameConfig): EKGameState {
-    const deck = buildDeck(playerIds.length)
+    const { deck, bombs } = buildDeck(playerIds.length)
     const hands: Record<string, Card[]> = {}
 
     // Deal 7 cards + 1 defuse to each player
+    let cardId = 0
     for (const pid of playerIds) {
       hands[pid] = [
-        { id: `defuse-start-${pid}`, type: 'defuse' },
+        { id: `defuse-start-${cardId++}`, type: 'defuse' },
         ...deck.splice(0, 7),
       ]
     }
+
+    // Now insert exploding kittens into the remaining deck
+    const finalDeck = shuffle([...deck, ...bombs])
 
     return {
       phase: 'playing',
       currentPlayerId: playerIds[0],
       winner: null,
-      deck,
+      deck: finalDeck,
       hands,
       discardPile: [],
       turnOrder: [...playerIds],
