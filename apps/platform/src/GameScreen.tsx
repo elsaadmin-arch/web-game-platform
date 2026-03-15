@@ -10,10 +10,11 @@ interface Props {
   myId: string
   isHost: boolean
   send: (msg: object) => void
+  onReturnToLobby: () => void
   onLeave: () => void
 }
 
-export default function GameScreen({ state, players, myId, isHost, send, onLeave }: Props) {
+export default function GameScreen({ state, players, myId, isHost, send, onReturnToLobby, onLeave }: Props) {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
   const [favorTargetId, setFavorTargetId] = useState<string | null>(null)
 
@@ -51,9 +52,24 @@ export default function GameScreen({ state, players, myId, isHost, send, onLeave
         <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">
           {state.winner === myId ? 'You won!' : `${winner?.name ?? 'Someone'} won!`}
         </h2>
-        <button onClick={onLeave} className="px-6 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-sm font-medium text-zinc-600 dark:text-zinc-300">
-          Leave
-        </button>
+        <div className="flex flex-col gap-3 w-full max-w-xs">
+          {isHost && (
+            <button onClick={() => send({ type: 'rematch' })}
+              className="w-full py-3 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-semibold text-base hover:opacity-90 transition">
+              🔄 Rematch
+            </button>
+          )}
+          {!isHost && (
+            <p className="text-center text-sm text-zinc-400">Waiting for host to start a rematch…</p>
+          )}
+          <button onClick={onReturnToLobby}
+            className="w-full py-3 rounded-xl border border-zinc-200 dark:border-zinc-700 text-sm font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition">
+            Back to Lobby
+          </button>
+          <button onClick={onLeave} className="text-xs text-zinc-400 hover:text-zinc-600 transition text-center">
+            Leave Room
+          </button>
+        </div>
       </div>
     )
   }

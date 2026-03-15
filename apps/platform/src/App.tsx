@@ -8,7 +8,7 @@ export default function App() {
     name, setName,
     joinCode, setJoinCode,
     roomCode, players, isHost, gameState, playerId,
-    send, leave, createRoom, joinRoom,
+    send, leave, returnToLobby, createRoom, joinRoom,
   } = useRoom()
 
   const [intent, setIntent] = useState<'create' | 'join'>('create')
@@ -42,7 +42,7 @@ export default function App() {
   }
 
   if (screen === 'in-game' && gameState) return (
-    <GameScreen state={gameState} players={players} myId={playerId} isHost={isHost} send={send} onLeave={leave} />
+    <GameScreen state={gameState} players={players} myId={playerId} isHost={isHost} send={send} onReturnToLobby={returnToLobby} onLeave={leave} />
   )
 
   if (screen === 'landing') return (
