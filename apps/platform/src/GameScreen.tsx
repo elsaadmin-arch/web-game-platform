@@ -74,7 +74,7 @@ export default function GameScreen({ state, players, myId, isHost, send, onRetur
     )
   }
 
-  if (state.phase === 'inserting_kitten' && isHost) {
+  if (state.phase === 'inserting_kitten' && myId === state.currentPlayerId) {
     return (
       <div className="min-h-screen bg-white dark:bg-zinc-950 flex flex-col items-center justify-center gap-6 px-6">
         <div className="text-5xl">💣</div>
@@ -88,6 +88,17 @@ export default function GameScreen({ state, players, myId, isHost, send, onRetur
             </button>
           ))}
         </div>
+      </div>
+    )
+  }
+
+  if (state.phase === 'inserting_kitten' && myId !== state.currentPlayerId) {
+    const bomber = players.find(p => p.id === state.currentPlayerId)
+    return (
+      <div className="min-h-screen bg-white dark:bg-zinc-950 flex flex-col items-center justify-center gap-6 px-6">
+        <div className="text-5xl">😅</div>
+        <h2 className="text-xl font-bold text-zinc-900 dark:text-white">{bomber?.name ?? 'Someone'} defused the bomb!</h2>
+        <p className="text-sm text-zinc-400">Waiting for them to place it back in the deck…</p>
       </div>
     )
   }

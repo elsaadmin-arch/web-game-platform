@@ -6,6 +6,12 @@ export function applyDrawCard(s: EKGameState, playerId: string): EKGameState {
   if (s.pendingFavor) return s
 
   s = { ...s, topThree: null }
+
+  // Guard: empty deck — end turn without drawing
+  if (s.deck.length === 0) {
+    return endTurn(s)
+  }
+
   const [drawn, ...rest] = s.deck
   s = { ...s, deck: rest }
 
