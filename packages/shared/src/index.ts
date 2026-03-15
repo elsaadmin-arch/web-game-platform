@@ -6,7 +6,7 @@ export interface GameConfig {
 }
 
 export interface GameState {
-  phase: 'waiting' | 'playing' | 'finished'
+  phase: 'waiting' | 'playing' | 'inserting_kitten' | 'finished'
   currentPlayerId: string | null
   winner: string | null
   [key: string]: unknown
@@ -50,13 +50,14 @@ export interface Player {
 export type ClientMessage =
   | { type: 'join'; name: string }
   | { type: 'rejoin'; playerId: string; name: string }
-  | { type: 'action'; action: PlayerAction }
+  | { type: 'start_game' }
+  | { type: 'action'; action: unknown }
   | { type: 'rematch' }
   | { type: 'leave' }
 
 export type ServerMessage =
   | { type: 'room_update'; room: Room }
-  | { type: 'game_state'; state: GameState }
-  | { type: 'error'; message: string }
   | { type: 'player_joined'; player: Player }
   | { type: 'player_left'; playerId: string }
+  | { type: 'game_over'; winnerId: string | null }
+  | { type: 'error'; message: string }

@@ -1,4 +1,9 @@
 import type { ClientMessage, ServerMessage, Room, Player } from '@wgp/shared'
+import { ExplodingKittensPlugin } from '../../games/exploding-kittens/src/index'
+
+const PLUGINS = {
+  'exploding-kittens': ExplodingKittensPlugin,
+}
 
 function generateRoomCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -15,7 +20,6 @@ export class RoomDurableObject {
   }
 
   async fetch(request: Request): Promise<Response> {
-    // Restore room from storage on cold start
     if (!this.room) {
       this.room = await this.state.storage.get<Room>('room') ?? null
     }
@@ -49,7 +53,6 @@ export class RoomDurableObject {
     server.addEventListener('close', () => {
       const playerId = this.sessions.get(server)
       if (playerId && this.room) {
-        // Mark as disconnected but keep in room (they may rejoin)
         const player = this.room.players.find(p => p.id === playerId)
         if (player) player.connected = false
         this.sessions.delete(server)
@@ -67,14 +70,12 @@ export class RoomDurableObject {
 
   private handleMessage(ws: WebSocket, msg: ClientMessage) {
     if (msg.type === 'rejoin') {
-      // Existing player reconnecting — restore their slot
       if (!this.room) {
         this.send(ws, { type: 'error', message: 'Room not found' })
         return
       }
       const player = this.room.players.find(p => p.id === msg.playerId)
       if (!player) {
-        // Player not in room — treat as fresh join
         this.handleMessage(ws, { type: 'join', name: msg.name })
         return
       }
@@ -111,18 +112,79 @@ export class RoomDurableObject {
       this.saveRoom()
       this.broadcastExcept(ws, { type: 'player_joined', player })
       this.broadcast({ type: 'room_update', room: this.room })
+      return
+    }
+
+    if (msg.type === 'start_game') {
+      if (!this.room) return
+      const playerId = this.sessions.get(ws)
+      if (playerId !== this.room.hostId) {
+        this.send(ws, { type: 'error', message: 'Only the host can start the game' })
+        return
+      }
+      if (this.room.players.length < 2) {
+        this.send(ws, { type: 'error', message: 'Need at least 2 players' })
+        return
+      }
+
+      const plugin = PLUGINS[this.room.gameId as keyof typeof PLUGINS]
+      if (!plugin) {
+        this.send(ws, { type: 'error', message: 'Unknown game' })
+        return
+      }
+
+      const playerIds = this.room.players.map(p => p.id)
+      this.room.state = plugin.getInitialState(playerIds, { maxPlayers: plugin.maxPlayers })
+      this.room.lastActivityAt = Date.now()
+      this.saveRoom()
+      this.broadcast({ type: 'room_update', room: this.room })
+      return
     }
 
     if (msg.type === 'action' && this.room) {
-      this.room.lastActivityAt = Date.now()
-      this.saveRoom()
-      // TODO: route to game plugin applyAction
+      const playerId = this.sessions.get(ws)
+      if (!playerId) return
+
+      const plugin = PLUGINS[this.room.gameId as keyof typeof PLUGINS]
+      if (!plugin) return
+
+      if (this.room.state.phase === 'waiting' || this.room.state.phase === 'finished') {
+        this.send(ws, { type: 'error', message: 'Game is not in progress' })
+        return
+      }
+
+      try {
+        const newState = plugin.applyAction(
+          this.room.state,
+          { type: 'ek', playerId, payload: msg.action },
+          { maxPlayers: plugin.maxPlayers }
+        )
+
+        this.room.state = newState
+        this.room.lastActivityAt = Date.now()
+        this.saveRoom()
+        this.broadcast({ type: 'room_update', room: this.room })
+
+        // Check win condition
+        if (plugin.isGameOver(newState)) {
+          const winner = plugin.getWinner(newState)
+          this.broadcast({ type: 'game_over', winnerId: winner })
+        }
+      } catch (err) {
+        this.send(ws, { type: 'error', message: 'Invalid action' })
+      }
+      return
     }
 
     if (msg.type === 'rematch' && this.room) {
+      const playerId = this.sessions.get(ws)
+      if (playerId !== this.room.hostId) return
+
+      this.room.state = { phase: 'waiting', currentPlayerId: null, winner: null }
       this.room.lastActivityAt = Date.now()
       this.saveRoom()
-      // TODO: reset game state
+      this.broadcast({ type: 'room_update', room: this.room })
+      return
     }
   }
 
