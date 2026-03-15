@@ -1,0 +1,10 @@
+{
+  "name": "web-game-platform",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "workers/*",
+    "games/*",
+    "packages/*"
+  ]
+}
